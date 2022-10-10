@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <title>WebRTC 加载本地摄像头</title>
+    <style>
+        /* 滤镜处理 */
+        /* .videoStyle1 {
+            -webkit-filter: blur(4px) invert(1) opacity(0.5);
+        }
+
+        .videoStyle2 {
+            filter: hue-rotate(180deg) saturate(200%);
+            -moz-filter: hue-rotate(180deg) saturate(200%);
+            -webkit-filter: hue-rotate(180deg) saturate(200%);
+        } */
+        video {
+				border: 1px solid black;
+				max-width: 100%;
+				width: 320px;
+			}
+    </style>
+    <script src="./jquery-2.1.4.min.js"></script>
+    <script type="text/javascript">
+        (function ($) {
+            // 自定义函数video
+            $.fn.video = function (msc, streamAction) {
+                const setting = {
+                    video: true,  //获取视频
+                    // audio: false,    //不获取音频
+                    audio: true    //不获取音频
+                };
+                // jQuery.extend(setting, msc);
+                this.get(0).addEventListener('loadedmetadata', function () {
+                    console.log("视频加载完成");
+                });
+
+                // navigator.getUserMedia(constraints,successCallback, errorCallback );
+                // constraints 指定了请求使用媒体的类型，还有每个类型的所需要的参数。例如下面setting 只获取视频而不获取音频
+                // successCallback 当调用成功后，successCallback中指定的函数就被调用，包含了媒体流的MediaStream对象作为它的参数。
+                //errorCallback 当调用失败，errorCallback中指定的函数就会被调用，MediaStreamError对象作为它唯一的参数。
+                navigator.mediaDevices.getUserMedia(setting)
+                    .then(stream => {
+                        // 将产生的视频流作为video 的src/srcObject 属性资源
+                        this.get(0).srcObject = stream;
+                        if (typeof (streamAction) == "function") {
+                            streamAction(stream);
+                        }
+                    }).catch(e => console.log('navigator.getUserMedia error: ', e));
+            }
+        })(jQuery);
+    </script>
+    <script type="text/javascript">
+        $(function () {
+            console.log( $("#localVideo"));
+            $("#localVideo").video({
+                video: true
+            });
+        })
+        function stoppl(){
+           console.log( $("#localVideo").get(0).pause());;
+        }
+    </script>
+</head>
+
+<body>
+    <button onclick="stoppl()">停止停止播放</button>
+    <h1>WebRTC 加载本地摄像头</h1>
+    <video id="localVideo" class="videoStyle1 videoStyle2" autoplay playsinline></video>
+    <!-- <video id="localVideo" class=" videoStyle2" autoplay playsinline></video> -->
+    <!-- <video id="localVideo" class="videoStyle1" autoplay playsinline></video> -->
+
+    注意代码中不要忘记在 video 标签添加 autoplay 属性. 否则, 你将只能看到一张图片而不是动态视频!
+为了确保video标签大小不会超出父容器.添加了 width 和 max-width 来设置video标签的首选尺寸和最大尺寸. 浏览器将会自动计算其高度．
+</body>
+
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <title>WebRTC实践传输视频流</title>
+    <style type="text/css">
+        video {
+            border: 1px solid black;
+            background-color: black;
+            max-width: 100%;
+            width: 320px;
+        }
+
+        .videoStyle1 {
+            -webkit-filter: blur(4px) invert(1) opacity(0.5);
+        }
+
+        .videoStyle2 {
+            filter: hue-rotate(180deg) saturate(200%);
+            -moz-filter: hue-rotate(180deg) saturate(200%);
+            -webkit-filter: hue-rotate(180deg) saturate(200%);
+        }
+    </style>
+    <!-- <script src="../javascript/adapter.js"></script> -->
+    <!-- <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script> -->
+    <script src="adapter-latest.js"></script>
+    <script src="./jquery-2.1.4.min.js"></script>
+    <script type="text/javascript">
+        (function ($) {
+            var first = true;
+            //创建网络连接
+            let localPeerConnection = new RTCPeerConnection(null);
+            // 监听 localPeerConnection.setLocalDescription(des); 触发localPeerConnection 的 icecandidate 事件
+            // 监听 localPeerConnection.setRemoteDescription(des); 触发localPeerConnection 的 addstream 事件
+            // 一次的setLocalDescription 设置,会触发多次icecandidate 事件,当 e.candidate 为null 时,停止触发,即中继完成
+            localPeerConnection.addEventListener('icecandidate', function (e) {
+                console.log(e);
+                if (first) {
+                    // 接收到发送过来的信令
+                    trace(`(5).李四增加ICE候选节点。`);
+                    remotePeerConnection.addIceCandidate(new RTCIceCandidate(e.candidate));
+                    first = false;
+                }
+            });
+
+            let remotePeerConnection = new RTCPeerConnection(null);
+            // 监听接收到视频流数据。
+            remotePeerConnection.addEventListener('addstream', function (e) {
+                console.log('--------',e,'---------');
+                $('#remoteVideo').get(0).srcObject = e.stream;
+                trace('(6).李四 接收到视频流数据。');
+            });
+
+            // 远程的对方的操作
+            function receivedAction() {
+                var remoteDesc = JSON.parse(localStorage.pc1);
+                trace(`(4).李四接收到offer信令。`);
+                ///更改远程描述，抛出addstream事件
+                remotePeerConnection.setRemoteDescription(remoteDesc);
+
+                ///收到后应答请求
+                // 远程地址主动发出信号createAnswer 同createOffer 一样,返回媒体信息
+                remotePeerConnection.createAnswer().then(des => { // des 为 sdp信令  主动方称为offer ,接入方为answer
+                    ///更改本地描述，抛出icecandidate事件
+                    remotePeerConnection.setLocalDescription(des).then(() =>
+
+                        trace(`(7).李四回复Answer信令。`));
+                    ///更改远程描述，抛出addstream事件
+                    localPeerConnection.setRemoteDescription(des).then(() => {
+                        trace(`(8).张三收到Answer信令。`);
+                        console.log('//////////',des);
+                        trace(`(9).张三与李四视频通话建立成功!`);
+                    });
+                });
+            }
+            $.fn.video = function () {
+                const setting = {
+                    video: true,
+                    audio: false
+                };
+                trace('(1).张三创建RTCPeerConnection。');
+                navigator.mediaDevices.getUserMedia(setting).then(stream => {
+                    // 写入到视频播放器video 中,使其实时播放
+                    this.get(0).srcObject = stream;
+
+                    localPeerConnection.addStream(stream);
+                    trace('(2).张三将本地视频流增加到长连接中。');
+                }).catch(error => trace(`navigator.getUserMedia error: ${error.toString()}.`));
+            }
+            $.fn.call = function () {
+                trace('(3).张三发送视频会话请求Offer信令。');
+                ///主动向远程终端发起视频会话请求
+                // 张三通过RTCPeerConnection createOffer()方法创造了一个offer（SDP会话描述） 。
+                // createOffer 拿到浏览器支持的媒体信息
+                localPeerConnection.createOffer({
+                    offerToReceiveVideo: 1,
+                    // 传统的布尔选项，用于控制是否向远程对等方提供尝试发送视频的机会。如果此值为false，即使本地端将发送视频数据，也不会提供远程端点发送视频数据。如果此值为true，即使本地端将不发送视频数据，也将向远程端点发送视频数据。默认行为是仅在本地端正在发送视频时才提供接收视频，否则不提供。 为了在现代实现中模拟这种行为，该成员的值为false将设置所有现有视频收发器的方向以排除接收（即设置为“仅发送”或“无效”）。 在现代实现中，该成员的值为 true 的存在将确保至少有一个收发器集可以接收尚未停止的视频，如果没有，则将创建一个。
+                }).then(des => {
+                    ///设置视频源触发icecandidate事件
+                    // 张三通过他创建的offer调用setLocalDescription()，保存本地会话描述.
+                    localPeerConnection.setLocalDescription(des);
+                    //实际应用中des可以通过消息服务等发送出去。
+                    localStorage.pc1 = JSON.stringify(des);
+                    // 调用另一端,模拟远程
+                    receivedAction();
+                });
+            }
+
+            // 自定义日志信息写入
+            function trace(text) {
+                var d = new Date();
+                var strD = d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds();
+                var html = $("#outDiv").html() + `<p>${strD} ${text.trim()}</p>`;
+                $("#outDiv").html(html);
+            }
+        })(jQuery);
+    </script>
+    <script type="text/javascript">
+        $(function () {
+            // 加载视频
+            $("#localVideo").video();
+            // 切换样式
+            $("input").click(function () {
+                switch (this.id) {
+                    case "OpenRemovVideo":
+                        $(this).call();
+                        break;
+                    default:
+                        $("video").attr('class', this.id);
+                        break;
+                }
+            });
+
+        })
+    </script>
+</head>
+
+<body>
+    <h1>WebRTC实践传输视频流</h1>
+    <div>
+        <input type="button" value="呼叫李四" id="OpenRemovVideo" />
+        <input type="button" value="样式1" id="videoStyle1" />
+        <input type="button" value="样式2" id="videoStyle2" />
+    </div>
+    <table border="0" style="width: 100%;">
+        <tr>
+            <td style="width: 500px;">
+                <fieldset>
+                    <legend>张三</legend>
+                    <video id="localVideo" autoplay playsinline></video>
+                </fieldset>
+                <fieldset>
+                    <legend>李四</legend>
+                    <!-- 不希望用户来拖动进度条的话,可以直接使用 playsinline属性 -->
+                    <video id="remoteVideo" autoplay playsinline></video>
+                </fieldset>
+
+            </td>
+            <td style="vertical-align: top;">
+                <fieldset style="height: 470px;">
+                    <legend>运行日志</legend>
+                    <div id="outDiv"></div>
+                </fieldset>
+            </td>
+        </tr>
+    </table>
+    <pre>
+            点对点连接流程：
+            张三创造了一个RTCPeerConnection 对象。
+            张三通过RTCPeerConnection createOffer()方法创造了一个offer（SDP会话描述） 。
+            张三通过他创建的offer调用setLocalDescription()，保存本地会话描述。
+            张三发送信令给李四。
+            李四接通带有张三offer的电话，调用setRemoteDescription() ，李四的RTCPeerConnection知道张三的设置（张三的本地描述到了李四这里，就成了李四的远程会话描述）。
+            李四调用createAnswer()，将李四的本地会话描述（local session description）成功回调。
+            李四调用setLocalDescription()设置他自己的本地局部描述。
+            李四发送应答信令answer给张三。
+            张三将李四的应答answer用setRemoteDescription()保存为远程会话描述（李四的remote session description）。
+            ————————————————
+            版权声明：本文为CSDN博主「黒木涯」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+            原文链接：https://blog.csdn.net/xxxlllbbb/article/details/108124000
+        </pre>
+</body>
+
+</html>
